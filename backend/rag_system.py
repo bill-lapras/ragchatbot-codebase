@@ -57,7 +57,7 @@ class RAGSystem:
         for lesson, summary in zip(course.lessons, summaries):
             lesson.summary = summary if isinstance(summary, str) else None
 
-    def add_course_document(self, file_path: str) -> Tuple[Course, int]:
+    def add_course_document(self, file_path: str) -> Tuple[Optional[Course], int]:
         """
         Add a single course document to the knowledge base.
 
@@ -147,7 +147,7 @@ class RAGSystem:
 
     def query(
         self, query: str, session_id: Optional[str] = None
-    ) -> Tuple[str, List[str], List[str]]:
+    ) -> Tuple[str, List[str], List[Optional[str]]]:
         """
         Process a user query using the RAG system with tool-based search.
 

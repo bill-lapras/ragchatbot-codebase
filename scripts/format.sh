@@ -13,18 +13,27 @@
 # Usage: ./scripts/format.sh
 # Prerequisites: uv sync --group dev
 
+set -u
+cd "$(dirname "$0")/.."
+status=0
+
 echo "🔧 Running code quality format script (will modify files)..."
 
 echo "1. Sorting imports with isort..."
-uv run isort backend/ main.py
+uv run isort backend/ main.py || status=1
 
 echo "2. Formatting code with Black..."
-uv run black backend/ main.py
+uv run black backend/ main.py || status=1
 
 echo "3. Running flake8 linting..."
-uv run flake8 backend/ main.py
+uv run flake8 backend/ main.py || status=1
 
 echo "4. Running mypy type checking..."
-uv run mypy backend/ main.py
+uv run mypy backend/ main.py || status=1
 
-echo "Code quality checks completed!"
+if [ "$status" -eq 0 ]; then
+    echo "✅ All checks passed!"
+else
+    echo "❌ Some checks failed."
+fi
+exit "$status"

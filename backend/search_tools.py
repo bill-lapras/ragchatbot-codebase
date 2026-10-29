@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Dict, List, Optional
 
 from vector_store import SearchResults, VectorStore
 
@@ -10,12 +10,10 @@ class Tool(ABC):
     @abstractmethod
     def get_tool_definition(self) -> Dict[str, Any]:
         """Return Anthropic tool definition for this tool"""
-        pass
 
     @abstractmethod
-    def execute(self, **kwargs) -> str:
+    def execute(self, *args: Any, **kwargs: Any) -> str:
         """Execute the tool with given parameters"""
-        pass
 
 
 class CourseSearchTool(Tool):
@@ -23,8 +21,10 @@ class CourseSearchTool(Tool):
 
     def __init__(self, vector_store: VectorStore):
         self.store = vector_store
-        self.last_sources = []  # Track sources from last search
-        self.last_source_links = []  # Track lesson links from last search
+        self.last_sources: List[str] = []  # Track sources from last search
+        self.last_source_links: List[Optional[str]] = (
+            []
+        )  # Track lesson links from last search
 
     def get_tool_definition(self) -> Dict[str, Any]:
         """Return Anthropic tool definition for this tool"""
@@ -143,8 +143,8 @@ class CourseOutlineTool(Tool):
 
     def __init__(self, vector_store: VectorStore):
         self.store = vector_store
-        self.last_sources = []  # Course and lessons from last outline
-        self.last_source_links = []  # Their links
+        self.last_sources: List[str] = []  # Course and lessons from last outline
+        self.last_source_links: List[Optional[str]] = []  # Their links
 
     def get_tool_definition(self) -> Dict[str, Any]:
         """Return Anthropic tool definition for this tool"""

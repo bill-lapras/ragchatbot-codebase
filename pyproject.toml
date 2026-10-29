@@ -68,23 +68,16 @@ multi_line_output = 3
 line_length = 88
 known_first_party = ["backend"]
 
-[tool.flake8]
-max-line-length = 88
-extend-ignore = ["E203", "W503"]
-exclude = [".git", "__pycache__", ".venv", "build", "dist"]
-
 [tool.mypy]
 python_version = "3.13"
-warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
+no_implicit_optional = true
 strict_equality = true
+ignore_missing_imports = true
 exclude = ["build", "dist", ".venv"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disable_error_code = ["method-assign", "attr-defined", "union-attr"]

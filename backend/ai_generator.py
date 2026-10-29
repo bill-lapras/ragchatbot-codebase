@@ -57,7 +57,11 @@ Provide only the direct answer to what was asked.
         self.model = model
 
         # Pre-build base API parameters
-        self.base_params = {"model": self.model, "temperature": 0, "max_tokens": 800}
+        self.base_params: Dict[str, Any] = {
+            "model": self.model,
+            "temperature": 0,
+            "max_tokens": 800,
+        }
 
     def generate_response(
         self,
@@ -93,7 +97,7 @@ Provide only the direct answer to what was asked.
         # Execute up to 2 rounds of tool calling
         for round_num in range(2):
             # Prepare API call parameters
-            api_params = {
+            api_params: Dict[str, Any] = {
                 **self.base_params,
                 "messages": messages,
                 "system": system_content,
@@ -119,7 +123,7 @@ Provide only the direct answer to what was asked.
                 return response.content[0].text
 
         # After max rounds, make final call without tools to get response
-        final_params = {
+        final_params: Dict[str, Any] = {
             **self.base_params,
             "messages": messages,
             "system": system_content,
