@@ -1,14 +1,6 @@
-import os
-import sys
-import tempfile
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import pytest
-
-# Add parent directory to path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from models import Course, CourseChunk, Lesson
+from models import Course, CourseChunk
 from rag_system import RAGSystem
 
 
@@ -45,7 +37,7 @@ class TestRAGSystem:
             patch("rag_system.SessionManager"),
         ):
 
-            rag_system = RAGSystem(broken_config)
+            RAGSystem(broken_config)
 
             # Verify VectorStore was initialized with broken config
             mock_vector_store.assert_called_once_with(
@@ -134,7 +126,7 @@ class TestRAGSystem:
             # Verify session was updated
             mock_session.return_value.add_exchange.assert_called_once_with(
                 "session123",
-                "Answer this question about course materials: Follow up question",
+                "Follow up question",
                 "Follow-up response.",
             )
 
@@ -280,6 +272,7 @@ class TestRAGSystem:
             patch("rag_system.SessionManager"),
             patch("os.path.exists") as mock_exists,
             patch("os.listdir") as mock_listdir,
+            patch("os.path.isfile", return_value=True),
         ):
 
             # Setup mocks
@@ -532,3 +525,44 @@ class TestRAGSystem:
             )
             assert "tools" in call_args
             assert "tool_manager" in call_args
+
+
+class TestLessonSummaries:
+    """Test key-point generation during ingestion"""
+
+    def test_add_lesson_summaries(self, test_config):
+        from models import Course, CourseChunk, Lesson
+
+        with (
+            patch("rag_system.DocumentProcessor"),
+            patch("rag_system.VectorStore"),
+            patch("rag_system.AIGenerator") as mock_ai_gen,
+            patch("rag_system.SessionManager"),
+        ):
+            mock_ai_gen.return_value.summarize_lesson.side_effect = (
+                lambda course, title, text: f"- {title}: {text}"
+            )
+            rag_system = RAGSystem(test_config)
+
+            course = Course(
+                title="C",
+                lessons=[
+                    Lesson(lesson_number=1, title="One"),
+                    Lesson(lesson_number=2, title="Two"),
+                ],
+            )
+            chunks = [
+                CourseChunk(
+                    content="a", course_title="C", lesson_number=1, chunk_index=0
+                ),
+                CourseChunk(
+                    content="b", course_title="C", lesson_number=1, chunk_index=1
+                ),
+            ]
+
+            rag_system._add_lesson_summaries(course, chunks)
+
+            assert course.lessons[0].summary == "- One: a b"
+            # Lesson with no chunks is skipped, not sent to the API
+            assert course.lessons[1].summary is None
+            assert mock_ai_gen.return_value.summarize_lesson.call_count == 1

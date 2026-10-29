@@ -1,11 +1,4 @@
-import os
-import sys
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
-
-# Add parent directory to path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from unittest.mock import Mock, patch
 
 from ai_generator import AIGenerator
 
@@ -208,7 +201,7 @@ class TestAIGenerator:
             generator = AIGenerator("test-api-key", "claude-sonnet-4-20250514")
 
             # Execute
-            response = generator.generate_response(
+            generator.generate_response(
                 "What's in lesson 1?",
                 tools=mock_tool_manager.get_tool_definitions(),
                 tool_manager=mock_tool_manager,

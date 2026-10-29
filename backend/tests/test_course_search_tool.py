@@ -1,13 +1,6 @@
-import os
-import sys
-from unittest.mock import Mock, patch
+import json
 
-import pytest
-
-# Add parent directory to path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from search_tools import CourseSearchTool
+from search_tools import CourseOutlineTool, CourseSearchTool
 from vector_store import SearchResults
 
 
@@ -192,6 +185,44 @@ class TestCourseSearchTool:
         assert tool.last_sources == ["Test Course"]
         assert tool.last_source_links == [None]
 
+    def test_format_results_dedupes_sources(self, mock_vector_store):
+        """Multiple chunks from the same lesson produce a single source"""
+        search_results = SearchResults(
+            documents=["Chunk A", "Chunk B"],
+            metadata=[
+                {"course_title": "Test Course", "lesson_number": 1, "chunk_index": 0},
+                {"course_title": "Test Course", "lesson_number": 1, "chunk_index": 1},
+            ],
+            distances=[0.1, 0.2],
+        )
+        mock_vector_store.search.return_value = search_results
+
+        tool = CourseSearchTool(mock_vector_store)
+        result = tool.execute("test query")
+
+        # Both chunks still go to Claude
+        assert "Chunk A" in result
+        assert "Chunk B" in result
+        assert tool.last_sources == ["Test Course - Lesson 1"]
+        assert tool.last_source_links == ["https://example.com/lesson1"]
+
+    def test_format_results_falls_back_to_course_link(self, mock_vector_store):
+        """Without a lesson link, the course link is used"""
+        search_results = SearchResults(
+            documents=["Test content"],
+            metadata=[{"course_title": "Test Course", "chunk_index": 0}],
+            distances=[0.1],
+        )
+        mock_vector_store.search.return_value = search_results
+        mock_vector_store.get_course_link.return_value = "https://example.com/course"
+
+        tool = CourseSearchTool(mock_vector_store)
+        tool.execute("test query")
+
+        assert tool.last_sources == ["Test Course"]
+        assert tool.last_source_links == ["https://example.com/course"]
+        mock_vector_store.get_course_link.assert_called_once_with("Test Course")
+
     def test_get_tool_definition(self, mock_vector_store):
         """Test that tool definition is properly structured"""
         # Setup
@@ -285,3 +316,73 @@ class TestCourseSearchTool:
 
         assert tool.last_sources == expected_sources
         assert tool.last_source_links == expected_links
+
+
+class TestCourseOutlineTool:
+    """Test CourseOutlineTool source tracking"""
+
+    def test_outline_tracks_course_and_lesson_sources(self, mock_vector_store):
+        """Outline records the course and each lesson with its link"""
+        lessons = [
+            {
+                "lesson_number": 0,
+                "lesson_title": "Intro",
+                "lesson_link": "https://example.com/l0",
+            },
+            {"lesson_number": 1, "lesson_title": "Basics", "lesson_link": None},
+        ]
+        mock_vector_store.course_catalog.get.return_value = {
+            "metadatas": [
+                {
+                    "title": "Test Course",
+                    "course_link": "https://example.com/course",
+                    "lessons_json": json.dumps(lessons),
+                }
+            ]
+        }
+
+        tool = CourseOutlineTool(mock_vector_store)
+        result = tool.execute("Test")
+
+        assert "Lesson 0: Intro" in result
+        assert tool.last_sources == [
+            "Test Course",
+            "Lesson 0: Intro",
+            "Lesson 1: Basics",
+        ]
+        assert tool.last_source_links == [
+            "https://example.com/course",
+            "https://example.com/l0",
+            None,
+        ]
+
+    def test_outline_clears_sources_when_course_not_found(self, mock_vector_store):
+        """A failed lookup does not leave stale sources behind"""
+        mock_vector_store._resolve_course_name.return_value = None
+
+        tool = CourseOutlineTool(mock_vector_store)
+        tool.last_sources = ["stale"]
+        tool.last_source_links = ["https://stale"]
+
+        tool.execute("Missing")
+
+        assert tool.last_sources == []
+        assert tool.last_source_links == []
+
+    def test_outline_includes_lesson_summaries(self, mock_vector_store):
+        """Stored key points appear under their lesson"""
+        lessons = [
+            {
+                "lesson_number": 1,
+                "lesson_title": "Basics",
+                "lesson_link": None,
+                "summary": "- Point one\n- Point two",
+            }
+        ]
+        mock_vector_store.course_catalog.get.return_value = {
+            "metadatas": [{"title": "Test Course", "lessons_json": json.dumps(lessons)}]
+        }
+
+        result = CourseOutlineTool(mock_vector_store).execute("Test")
+
+        assert "Lesson 1: Basics\n- Point one\n- Point two" in result

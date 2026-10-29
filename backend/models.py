@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -9,6 +9,7 @@ class Lesson(BaseModel):
     lesson_number: int  # Sequential lesson number (1, 2, 3, etc.)
     title: str  # Lesson title
     lesson_link: Optional[str] = None  # URL link to the lesson
+    summary: Optional[str] = None  # Key points, generated at ingestion
 
 
 class Course(BaseModel):

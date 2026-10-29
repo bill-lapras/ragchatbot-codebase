@@ -1,15 +1,5 @@
-import os
-import shutil
-import sys
-import tempfile
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import pytest
-
-# Add parent directory to path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from models import Course, CourseChunk, Lesson
 from vector_store import SearchResults, VectorStore
 
 
@@ -150,7 +140,7 @@ class TestVectorStore:
             )
 
             # Execute search with lesson filter
-            result = vector_store.search("test query", lesson_number=2)
+            vector_store.search("test query", lesson_number=2)
 
             # Assert search was called with lesson filter
             mock_chroma_collection.query.assert_called_once_with(
@@ -192,9 +182,7 @@ class TestVectorStore:
             )
 
             # Execute search with both filters
-            result = vector_store.search(
-                "test query", course_name="Specific", lesson_number=3
-            )
+            vector_store.search("test query", course_name="Specific", lesson_number=3)
 
             # Assert content search was called with combined filter
             expected_filter = {

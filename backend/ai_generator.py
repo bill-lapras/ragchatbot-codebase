@@ -26,6 +26,7 @@ When using the course outline tool, always include:
 - Course title
 - Course link (if available)
 - Complete lesson list with lesson numbers and titles
+- Each lesson's key points as nested bullets, when the outline provides them
 - Present information in a clear, structured format
 
 Response Protocol:
@@ -43,12 +44,24 @@ All responses must be:
 Provide only the direct answer to what was asked.
 """
 
-    def __init__(self, api_key: str, model: str):
-        self.client = anthropic.Anthropic(api_key=api_key)
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        if base_url:
+            # Taskforce gateway authenticates via an "apikey" header
+            self.client = anthropic.Anthropic(
+                api_key=api_key,
+                base_url=base_url,
+                default_headers={"apikey": api_key},
+            )
+        else:
+            self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
 
         # Pre-build base API parameters
-        self.base_params = {"model": self.model, "temperature": 0, "max_tokens": 800}
+        self.base_params: Dict[str, Any] = {
+            "model": self.model,
+            "temperature": 0,
+            "max_tokens": 800,
+        }
 
     def generate_response(
         self,
@@ -84,7 +97,7 @@ Provide only the direct answer to what was asked.
         # Execute up to 2 rounds of tool calling
         for round_num in range(2):
             # Prepare API call parameters
-            api_params = {
+            api_params: Dict[str, Any] = {
                 **self.base_params,
                 "messages": messages,
                 "system": system_content,
@@ -110,7 +123,7 @@ Provide only the direct answer to what was asked.
                 return response.content[0].text
 
         # After max rounds, make final call without tools to get response
-        final_params = {
+        final_params: Dict[str, Any] = {
             **self.base_params,
             "messages": messages,
             "system": system_content,
@@ -118,6 +131,32 @@ Provide only the direct answer to what was asked.
 
         final_response = self.client.messages.create(**final_params)
         return final_response.content[0].text
+
+    SUMMARY_PROMPT = """Summarize this lesson transcript as 2-4 short bullet points covering its key ideas.
+Each bullet starts with "- " and is under 15 words. Output only the bullets."""
+
+    def summarize_lesson(
+        self, course_title: str, lesson_title: str, text: str
+    ) -> Optional[str]:
+        """
+        Generate key-point bullets for a lesson. Returns None on failure so
+        ingestion can continue without a summary.
+        """
+        try:
+            response = self.client.messages.create(
+                **{**self.base_params, "max_tokens": 200},
+                system=self.SUMMARY_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Course: {course_title}\nLesson: {lesson_title}\n\n{text}",
+                    }
+                ],
+            )
+            return response.content[0].text.strip()
+        except Exception as e:
+            print(f"Error summarizing lesson '{lesson_title}': {e}")
+            return None
 
     def _handle_tool_execution(self, initial_response, messages: List, tool_manager):
         """

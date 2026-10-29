@@ -1,12 +1,7 @@
 import os
-import sys
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
-
-# Add parent directory to path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from config import Config, config
 
 
@@ -15,7 +10,9 @@ class TestConfig:
 
     def test_default_config_values(self):
         """Test default configuration values"""
-        default_config = Config()
+        # Isolate from .env / shell overrides
+        with patch.dict(os.environ, {}, clear=True):
+            default_config = Config()
 
         # Test API settings
         assert default_config.ANTHROPIC_MODEL == "claude-sonnet-4-20250514"
@@ -29,15 +26,11 @@ class TestConfig:
         # Test database paths
         assert default_config.CHROMA_PATH == "./chroma_db"
 
-    def test_broken_max_results_configuration(self):
-        """Test the critical MAX_RESULTS=0 configuration issue"""
+    def test_default_max_results_configuration(self):
+        """MAX_RESULTS=0 was a bug (no search results); default must be > 0"""
         default_config = Config()
 
-        # This test documents the current broken state
-        assert default_config.MAX_RESULTS == 0  # This is the bug!
-
-        # This value should be > 0 for the system to work properly
-        # When MAX_RESULTS=0, the vector search returns no results
+        assert default_config.MAX_RESULTS == 5
 
     def test_proper_max_results_configuration(self):
         """Test what the MAX_RESULTS configuration should be"""
@@ -122,6 +115,7 @@ class TestConfig:
     def test_config_impact_on_vector_search(self):
         """Test how MAX_RESULTS=0 impacts vector search behavior"""
         broken_config = Config()
+        broken_config.MAX_RESULTS = 0
         proper_config = Config()
         proper_config.MAX_RESULTS = 5
 
@@ -168,8 +162,9 @@ class TestConfig:
 
             return errors
 
-        # Test current broken config
+        # Test a broken config
         broken_config = Config()
+        broken_config.MAX_RESULTS = 0
         errors = validate_config(broken_config)
 
         # Should have validation errors
@@ -241,7 +236,7 @@ class TestConfig:
 
         # Changes to one shouldn't affect the other
         config1.MAX_RESULTS = 10
-        assert config2.MAX_RESULTS == 0  # Still the default broken value
+        assert config2.MAX_RESULTS == 5  # Still the default value
 
     @pytest.mark.parametrize(
         "max_results,expected_behavior",

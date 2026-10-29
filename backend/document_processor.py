@@ -43,7 +43,7 @@ class DocumentProcessor:
         i = 0
 
         while i < len(sentences):
-            current_chunk = []
+            current_chunk: List[str] = []
             current_size = 0
 
             # Build chunk starting from sentence i
@@ -154,9 +154,9 @@ class DocumentProcessor:
         # Process lessons and create chunks
         course_chunks = []
         current_lesson = None
-        lesson_title = None
+        lesson_title = ""
         lesson_link = None
-        lesson_content = []
+        lesson_content: List[str] = []
         chunk_counter = 0
 
         # Start processing from line 4 (after metadata)

@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional
 import chromadb
 from chromadb.config import Settings
 from models import Course, CourseChunk
-from sentence_transformers import SentenceTransformer
 
 
 @dataclass
@@ -69,7 +68,8 @@ class VectorStore:
     def _create_collection(self, name: str):
         """Create or get a ChromaDB collection"""
         return self.client.get_or_create_collection(
-            name=name, embedding_function=self.embedding_function
+            name=name,
+            embedding_function=self.embedding_function,  # type: ignore[arg-type]
         )
 
     def search(
@@ -161,6 +161,7 @@ class VectorStore:
                     "lesson_number": lesson.lesson_number,
                     "lesson_title": lesson.title,
                     "lesson_link": lesson.lesson_link,
+                    "summary": lesson.summary,
                 }
             )
 
@@ -291,3 +292,4 @@ class VectorStore:
             return None
         except Exception as e:
             print(f"Error getting lesson link: {e}")
+            return None

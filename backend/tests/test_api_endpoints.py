@@ -1,230 +1,187 @@
 import pytest
-import json
-from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch
 
 
 @pytest.mark.api
-class TestAPIEndpoints:
-    """Test suite for FastAPI endpoints"""
+class TestQueryEndpoint:
+    """Tests for POST /api/query"""
 
-    def test_root_endpoint(self, client):
-        """Test the root endpoint returns correct message"""
-        response = client.get("/")
-        assert response.status_code == 200
-        assert response.json() == {"message": "Course Materials RAG System API"}
-
-    def test_query_endpoint_with_session_id(self, client, sample_query_request):
-        """Test /api/query endpoint with provided session_id"""
+    def test_query_with_session_id(self, client, mock_rag_system, sample_query_request):
         response = client.post("/api/query", json=sample_query_request)
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        # Verify response structure
-        assert "answer" in data
-        assert "sources" in data
-        assert "source_links" in data
-        assert "session_id" in data
-        
-        # Verify content
-        assert data["answer"] == "This is a test response about course content."
-        assert data["sources"] == ["Building Towards Computer Use with Anthropic - Lesson 1"]
-        assert data["source_links"] == ["https://example.com/lesson1"]
-        assert data["session_id"] == "test-session-123"
 
-    def test_query_endpoint_without_session_id(self, client):
-        """Test /api/query endpoint without session_id (should create new session)"""
-        request_data = {"query": "What is computer use in AI?"}
-        response = client.post("/api/query", json=request_data)
-        
         assert response.status_code == 200
-        data = response.json()
-        
-        # Should create new session
-        assert data["session_id"] == "test-session-123"
-        assert data["answer"] == "This is a test response about course content."
+        assert response.json() == {
+            "answer": "This is a test response about course content.",
+            "sources": ["Building Towards Computer Use with Anthropic - Lesson 1"],
+            "source_links": ["https://example.com/lesson1"],
+            "session_id": "test-session-123",
+        }
+        mock_rag_system.query.assert_called_once_with(
+            "What is computer use in AI?", "test-session-123"
+        )
+        mock_rag_system.session_manager.create_session.assert_not_called()
 
-    def test_query_endpoint_invalid_request(self, client):
-        """Test /api/query endpoint with invalid request data"""
-        # Missing required 'query' field
+    def test_query_without_session_id_creates_session(self, client, mock_rag_system):
+        response = client.post("/api/query", json={"query": "What is computer use?"})
+
+        assert response.status_code == 200
+        assert response.json()["session_id"] == "new-session-456"
+        mock_rag_system.session_manager.create_session.assert_called_once()
+        mock_rag_system.query.assert_called_once_with(
+            "What is computer use?", "new-session-456"
+        )
+
+    def test_query_with_empty_session_id_creates_session(self, client, mock_rag_system):
+        response = client.post("/api/query", json={"query": "hi", "session_id": ""})
+
+        assert response.status_code == 200
+        assert response.json()["session_id"] == "new-session-456"
+
+    def test_query_allows_missing_source_links(self, client, mock_rag_system):
+        mock_rag_system.query.return_value = ("answer", ["Course A"], [None])
+
+        response = client.post("/api/query", json={"query": "q"})
+
+        assert response.status_code == 200
+        assert response.json()["source_links"] == [None]
+
+    def test_query_missing_query_field(self, client, mock_rag_system):
         response = client.post("/api/query", json={})
-        assert response.status_code == 422  # Validation error
 
-    def test_query_endpoint_empty_query(self, client):
-        """Test /api/query endpoint with empty query"""
-        request_data = {"query": ""}
-        response = client.post("/api/query", json=request_data)
-        
-        # Should still process (empty query is valid from API perspective)
+        assert response.status_code == 422
+        mock_rag_system.query.assert_not_called()
+
+    def test_query_wrong_type(self, client):
+        response = client.post("/api/query", json={"query": 123})
+        assert response.status_code == 422
+
+    def test_query_ignores_extra_fields(self, client):
+        response = client.post("/api/query", json={"query": "q", "extra": "x"})
         assert response.status_code == 200
 
-    def test_courses_endpoint(self, client):
-        """Test /api/courses endpoint returns course statistics"""
+    def test_query_rag_error_returns_500(self, client, mock_rag_system):
+        mock_rag_system.query.side_effect = RuntimeError("Anthropic API down")
+
+        response = client.post("/api/query", json={"query": "q"})
+
+        assert response.status_code == 500
+        assert response.json() == {"detail": "Anthropic API down"}
+
+
+@pytest.mark.api
+class TestCoursesEndpoint:
+    """Tests for GET /api/courses"""
+
+    def test_courses_returns_stats(self, client):
         response = client.get("/api/courses")
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        # Verify response structure
-        assert "total_courses" in data
-        assert "course_titles" in data
-        
-        # Verify content
-        assert data["total_courses"] == 2
-        assert data["course_titles"] == [
-            "Building Towards Computer Use with Anthropic", 
-            "Advanced AI Techniques"
-        ]
 
-    def test_clear_session_endpoint(self, client, sample_clear_session_request):
-        """Test /api/clear-session endpoint"""
+        assert response.status_code == 200
+        assert response.json() == {
+            "total_courses": 2,
+            "course_titles": [
+                "Building Towards Computer Use with Anthropic",
+                "Advanced AI Techniques",
+            ],
+        }
+
+    def test_courses_empty_catalog(self, client, mock_rag_system):
+        mock_rag_system.get_course_analytics.return_value = {
+            "total_courses": 0,
+            "course_titles": [],
+        }
+
+        response = client.get("/api/courses")
+
+        assert response.status_code == 200
+        assert response.json() == {"total_courses": 0, "course_titles": []}
+
+    def test_courses_error_returns_500(self, client, mock_rag_system):
+        mock_rag_system.get_course_analytics.side_effect = RuntimeError("db gone")
+
+        response = client.get("/api/courses")
+
+        assert response.status_code == 500
+        assert response.json() == {"detail": "db gone"}
+
+
+@pytest.mark.api
+class TestClearSessionEndpoint:
+    """Tests for POST /api/clear-session"""
+
+    def test_clear_session(self, client, mock_rag_system, sample_clear_session_request):
         response = client.post("/api/clear-session", json=sample_clear_session_request)
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        assert data["status"] == "success"
-        assert data["message"] == "Session cleared successfully"
 
-    def test_clear_session_endpoint_invalid_request(self, client):
-        """Test /api/clear-session endpoint with invalid request"""
-        # Missing required 'session_id' field
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "success",
+            "message": "Session cleared successfully",
+        }
+        mock_rag_system.session_manager.clear_session.assert_called_once_with(
+            "test-session-123"
+        )
+
+    def test_clear_session_missing_field(self, client):
         response = client.post("/api/clear-session", json={})
-        assert response.status_code == 422  # Validation error
-
-    def test_nonexistent_endpoint(self, client):
-        """Test accessing a non-existent endpoint"""
-        response = client.get("/api/nonexistent")
-        assert response.status_code == 404
-
-
-@pytest.mark.api
-class TestAPIErrorHandling:
-    """Test suite for API error handling"""
-
-    def test_query_endpoint_with_rag_system_error(self, client):
-        """Test /api/query endpoint structure (error injection requires app-level mocking)"""
-        # This test demonstrates the structure for error handling testing
-        # In a real scenario, you'd inject the error at the app level
-        request_data = {"query": "test query"}
-        response = client.post("/api/query", json=request_data)
-        
-        # With current mock setup, this should work normally
-        assert response.status_code == 200
-        
-        # To test actual error handling, you would need to:
-        # 1. Create a separate test app fixture with error-prone mocks
-        # 2. Or use dependency injection to override the RAG system
-        # 3. Or test error conditions in the actual app.py module tests
-
-    def test_courses_endpoint_with_rag_system_error(self, client):
-        """Test /api/courses endpoint when RAG system raises an exception"""
-        # Similar to above, this would need app-level error injection
-        response = client.get("/api/courses")
-        assert response.status_code == 200
-
-
-@pytest.mark.api
-class TestAPIRequestValidation:
-    """Test suite for API request validation"""
-
-    def test_query_endpoint_with_extra_fields(self, client):
-        """Test /api/query endpoint ignores extra fields"""
-        request_data = {
-            "query": "What is computer use?",
-            "session_id": "test-123",
-            "extra_field": "should be ignored"
-        }
-        response = client.post("/api/query", json=request_data)
-        assert response.status_code == 200
-
-    def test_query_endpoint_with_wrong_types(self, client):
-        """Test /api/query endpoint with wrong field types"""
-        request_data = {
-            "query": 123,  # Should be string
-            "session_id": "test-123"
-        }
-        response = client.post("/api/query", json=request_data)
         assert response.status_code == 422
 
-    def test_clear_session_with_wrong_types(self, client):
-        """Test /api/clear-session endpoint with wrong field types"""
-        request_data = {
-            "session_id": 123  # Should be string
-        }
-        response = client.post("/api/clear-session", json=request_data)
+    def test_clear_session_wrong_type(self, client):
+        response = client.post("/api/clear-session", json={"session_id": 123})
         assert response.status_code == 422
+
+    def test_clear_session_error_returns_500(self, client, mock_rag_system):
+        mock_rag_system.session_manager.clear_session.side_effect = KeyError("x")
+
+        response = client.post("/api/clear-session", json={"session_id": "s"})
+
+        assert response.status_code == 500
 
 
 @pytest.mark.api
-class TestAPIHeaders:
-    """Test suite for API headers and CORS"""
+class TestStaticAndCors:
+    """Tests for the frontend mount and CORS middleware"""
 
-    def test_cors_headers(self, client):
-        """Test that CORS headers are properly set"""
+    def test_root_serves_frontend_without_cache(self, client):
         response = client.get("/")
-        
-        # FastAPI TestClient doesn't simulate full CORS behavior
-        # but we can verify the response is successful
-        assert response.status_code == 200
 
-    def test_options_request(self, client):
-        """Test OPTIONS request for CORS preflight"""
-        response = client.options("/api/query")
-        # TestClient may not handle OPTIONS the same as a real browser
-        # This test serves as a placeholder for CORS testing
-        assert response.status_code in [200, 405]  # 405 is also acceptable
+        assert response.status_code == 200
+        assert "Course Materials" in response.text
+        assert (
+            response.headers["cache-control"] == "no-cache, no-store, must-revalidate"
+        )
+
+    def test_unknown_path_returns_404(self, client):
+        assert client.get("/does-not-exist.js").status_code == 404
+
+    def test_cors_preflight(self, client):
+        response = client.options(
+            "/api/query",
+            headers={
+                "Origin": "http://example.com",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == "http://example.com"
+        assert "POST" in response.headers["access-control-allow-methods"]
+
+    def test_cors_header_on_simple_request(self, client):
+        response = client.get("/api/courses", headers={"Origin": "http://example.com"})
+        assert response.headers["access-control-allow-origin"] == "*"
 
 
 @pytest.mark.api
 @pytest.mark.integration
-class TestAPIIntegration:
-    """Integration tests for API endpoints"""
+def test_session_workflow(client, mock_rag_system):
+    """New session is created, reused on follow-up, then cleared"""
+    first = client.post("/api/query", json={"query": "What courses exist?"})
+    session_id = first.json()["session_id"]
 
-    def test_full_query_workflow(self, client):
-        """Test a complete query workflow"""
-        # Step 1: Get course stats
-        courses_response = client.get("/api/courses")
-        assert courses_response.status_code == 200
-        
-        # Step 2: Query with a new session
-        query_response = client.post("/api/query", json={
-            "query": "Tell me about the courses available"
-        })
-        assert query_response.status_code == 200
-        session_id = query_response.json()["session_id"]
-        
-        # Step 3: Query with existing session
-        follow_up_response = client.post("/api/query", json={
-            "query": "Can you elaborate?",
-            "session_id": session_id
-        })
-        assert follow_up_response.status_code == 200
-        assert follow_up_response.json()["session_id"] == session_id
-        
-        # Step 4: Clear the session
-        clear_response = client.post("/api/clear-session", json={
-            "session_id": session_id
-        })
-        assert clear_response.status_code == 200
+    follow_up = client.post(
+        "/api/query", json={"query": "Elaborate", "session_id": session_id}
+    )
+    cleared = client.post("/api/clear-session", json={"session_id": session_id})
 
-    def test_multiple_concurrent_sessions(self, client):
-        """Test handling multiple concurrent sessions"""
-        # Create first session
-        response1 = client.post("/api/query", json={
-            "query": "First session query"
-        })
-        session1 = response1.json()["session_id"]
-        
-        # Create second session  
-        response2 = client.post("/api/query", json={
-            "query": "Second session query"
-        })
-        session2 = response2.json()["session_id"]
-        
-        # Both should work independently
-        assert response1.status_code == 200
-        assert response2.status_code == 200
-        # With current mock, they'll return the same session_id
-        # In real implementation, they should be different
+    assert follow_up.json()["session_id"] == session_id
+    assert cleared.status_code == 200
+    assert mock_rag_system.session_manager.create_session.call_count == 1
+    mock_rag_system.session_manager.clear_session.assert_called_once_with(session_id)
