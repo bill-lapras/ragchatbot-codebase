@@ -192,6 +192,44 @@ class TestCourseSearchTool:
         assert tool.last_sources == ["Test Course"]
         assert tool.last_source_links == [None]
 
+    def test_format_results_dedupes_sources(self, mock_vector_store):
+        """Multiple chunks from the same lesson produce a single source"""
+        search_results = SearchResults(
+            documents=["Chunk A", "Chunk B"],
+            metadata=[
+                {"course_title": "Test Course", "lesson_number": 1, "chunk_index": 0},
+                {"course_title": "Test Course", "lesson_number": 1, "chunk_index": 1},
+            ],
+            distances=[0.1, 0.2],
+        )
+        mock_vector_store.search.return_value = search_results
+
+        tool = CourseSearchTool(mock_vector_store)
+        result = tool.execute("test query")
+
+        # Both chunks still go to Claude
+        assert "Chunk A" in result
+        assert "Chunk B" in result
+        assert tool.last_sources == ["Test Course - Lesson 1"]
+        assert tool.last_source_links == ["https://example.com/lesson1"]
+
+    def test_format_results_falls_back_to_course_link(self, mock_vector_store):
+        """Without a lesson link, the course link is used"""
+        search_results = SearchResults(
+            documents=["Test content"],
+            metadata=[{"course_title": "Test Course", "chunk_index": 0}],
+            distances=[0.1],
+        )
+        mock_vector_store.search.return_value = search_results
+        mock_vector_store.get_course_link.return_value = "https://example.com/course"
+
+        tool = CourseSearchTool(mock_vector_store)
+        tool.execute("test query")
+
+        assert tool.last_sources == ["Test Course"]
+        assert tool.last_source_links == ["https://example.com/course"]
+        mock_vector_store.get_course_link.assert_called_once_with("Test Course")
+
     def test_get_tool_definition(self, mock_vector_store):
         """Test that tool definition is properly structured"""
         # Setup
