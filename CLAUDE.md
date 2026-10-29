@@ -14,6 +14,8 @@ chmod +x run.sh
 cd backend && uv run uvicorn app:app --reload --port 8000
 ```
 
+Always run the server with `uv`. Never use `pip` directly.
+
 ### Environment Setup
 ```bash
 # Install dependencies
