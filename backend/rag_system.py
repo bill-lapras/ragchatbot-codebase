@@ -36,6 +36,27 @@ class RAGSystem:
         self.tool_manager.register_tool(self.search_tool)
         self.tool_manager.register_tool(self.outline_tool)
 
+    # Enough transcript for a summary without sending the whole lesson
+    SUMMARY_INPUT_CHARS = 6000
+
+    def _add_lesson_summaries(self, course: Course, chunks: List[CourseChunk]):
+        """Generate key points for each lesson in parallel before storing"""
+        from concurrent.futures import ThreadPoolExecutor
+
+        def summarize(lesson: Lesson) -> Optional[str]:
+            text = " ".join(
+                c.content for c in chunks if c.lesson_number == lesson.lesson_number
+            )[: self.SUMMARY_INPUT_CHARS]
+            if not text:
+                return None
+            return self.ai_generator.summarize_lesson(course.title, lesson.title, text)
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            summaries = list(pool.map(summarize, course.lessons))
+
+        for lesson, summary in zip(course.lessons, summaries):
+            lesson.summary = summary if isinstance(summary, str) else None
+
     def add_course_document(self, file_path: str) -> Tuple[Course, int]:
         """
         Add a single course document to the knowledge base.
@@ -51,6 +72,8 @@ class RAGSystem:
             course, course_chunks = self.document_processor.process_course_document(
                 file_path
             )
+
+            self._add_lesson_summaries(course, course_chunks)
 
             # Add course metadata to vector store for semantic search
             self.vector_store.add_course_metadata(course)
@@ -106,6 +129,7 @@ class RAGSystem:
 
                     if course and course.title not in existing_course_titles:
                         # This is a new course - add it to the vector store
+                        self._add_lesson_summaries(course, course_chunks)
                         self.vector_store.add_course_metadata(course)
                         self.vector_store.add_course_content(course_chunks)
                         total_courses += 1

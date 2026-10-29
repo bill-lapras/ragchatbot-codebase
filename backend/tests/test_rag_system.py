@@ -533,3 +533,44 @@ class TestRAGSystem:
             )
             assert "tools" in call_args
             assert "tool_manager" in call_args
+
+
+class TestLessonSummaries:
+    """Test key-point generation during ingestion"""
+
+    def test_add_lesson_summaries(self, test_config):
+        from models import Course, CourseChunk, Lesson
+
+        with (
+            patch("rag_system.DocumentProcessor"),
+            patch("rag_system.VectorStore"),
+            patch("rag_system.AIGenerator") as mock_ai_gen,
+            patch("rag_system.SessionManager"),
+        ):
+            mock_ai_gen.return_value.summarize_lesson.side_effect = (
+                lambda course, title, text: f"- {title}: {text}"
+            )
+            rag_system = RAGSystem(test_config)
+
+            course = Course(
+                title="C",
+                lessons=[
+                    Lesson(lesson_number=1, title="One"),
+                    Lesson(lesson_number=2, title="Two"),
+                ],
+            )
+            chunks = [
+                CourseChunk(
+                    content="a", course_title="C", lesson_number=1, chunk_index=0
+                ),
+                CourseChunk(
+                    content="b", course_title="C", lesson_number=1, chunk_index=1
+                ),
+            ]
+
+            rag_system._add_lesson_summaries(course, chunks)
+
+            assert course.lessons[0].summary == "- One: a b"
+            # Lesson with no chunks is skipped, not sent to the API
+            assert course.lessons[1].summary is None
+            assert mock_ai_gen.return_value.summarize_lesson.call_count == 1

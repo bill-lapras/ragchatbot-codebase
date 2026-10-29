@@ -148,6 +148,7 @@ This is a Retrieval-Augmented Generation (RAG) system for course materials with 
 
 - The system automatically loads documents from docs/ on startup
 - ChromaDB data persists in backend/chroma_db/
+- Ingestion calls Claude once per lesson (`AIGenerator.summarize_lesson`, 4 in parallel) to store key points in `lessons_json`; the outline tool returns them. A re-index of all courses makes ~40 API calls
 - Ingestion skips courses whose title is already stored, so edited course files are not re-indexed; delete backend/chroma_db/ to rebuild
 - Course files must start with `Course Title:` / `Course Link:` / `Course Instructor:` lines, followed by `Lesson N: <title>` markers (optional `Lesson Link:` on the next line)
 - The `/api/query` endpoint is async but makes synchronous Anthropic and ChromaDB calls, which block the event loop
