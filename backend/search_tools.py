@@ -69,6 +69,10 @@ class CourseSearchTool(Tool):
             Formatted search results or error message
         """
 
+        # Clear sources from any previous search so stale ones aren't reported
+        self.last_sources = []
+        self.last_source_links = []
+
         # Use the vector store's unified search interface
         results = self.store.search(
             query=query, course_name=course_name, lesson_number=lesson_number

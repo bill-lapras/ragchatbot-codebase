@@ -134,7 +134,7 @@ class TestRAGSystem:
             # Verify session was updated
             mock_session.return_value.add_exchange.assert_called_once_with(
                 "session123",
-                "Answer this question about course materials: Follow up question",
+                "Follow up question",
                 "Follow-up response.",
             )
 
@@ -280,6 +280,7 @@ class TestRAGSystem:
             patch("rag_system.SessionManager"),
             patch("os.path.exists") as mock_exists,
             patch("os.listdir") as mock_listdir,
+            patch("os.path.isfile", return_value=True),
         ):
 
             # Setup mocks
