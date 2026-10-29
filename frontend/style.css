@@ -419,6 +419,24 @@ header h1 {
     line-height: 1.6;
 }
 
+/* Links inside answers: readable on the dark background */
+.message-content a {
+    color: #60a5fa;
+    text-decoration: underline;
+}
+
+.message-content a:hover {
+    color: #93c5fd;
+}
+
+[data-theme="light"] .message-content a {
+    color: var(--primary-color);
+}
+
+[data-theme="light"] .message-content a:hover {
+    color: var(--primary-hover);
+}
+
 .message-content code {
     background-color: rgba(0, 0, 0, 0.2);
     padding: 0.125rem 0.25rem;

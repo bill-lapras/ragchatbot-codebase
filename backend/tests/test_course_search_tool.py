@@ -7,7 +7,9 @@ import pytest
 # Add parent directory to path to import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from search_tools import CourseSearchTool
+import json
+
+from search_tools import CourseOutlineTool, CourseSearchTool
 from vector_store import SearchResults
 
 
@@ -323,3 +325,55 @@ class TestCourseSearchTool:
 
         assert tool.last_sources == expected_sources
         assert tool.last_source_links == expected_links
+
+
+class TestCourseOutlineTool:
+    """Test CourseOutlineTool source tracking"""
+
+    def test_outline_tracks_course_and_lesson_sources(self, mock_vector_store):
+        """Outline records the course and each lesson with its link"""
+        lessons = [
+            {
+                "lesson_number": 0,
+                "lesson_title": "Intro",
+                "lesson_link": "https://example.com/l0",
+            },
+            {"lesson_number": 1, "lesson_title": "Basics", "lesson_link": None},
+        ]
+        mock_vector_store.course_catalog.get.return_value = {
+            "metadatas": [
+                {
+                    "title": "Test Course",
+                    "course_link": "https://example.com/course",
+                    "lessons_json": json.dumps(lessons),
+                }
+            ]
+        }
+
+        tool = CourseOutlineTool(mock_vector_store)
+        result = tool.execute("Test")
+
+        assert "Lesson 0: Intro" in result
+        assert tool.last_sources == [
+            "Test Course",
+            "Lesson 0: Intro",
+            "Lesson 1: Basics",
+        ]
+        assert tool.last_source_links == [
+            "https://example.com/course",
+            "https://example.com/l0",
+            None,
+        ]
+
+    def test_outline_clears_sources_when_course_not_found(self, mock_vector_store):
+        """A failed lookup does not leave stale sources behind"""
+        mock_vector_store._resolve_course_name.return_value = None
+
+        tool = CourseOutlineTool(mock_vector_store)
+        tool.last_sources = ["stale"]
+        tool.last_source_links = ["https://stale"]
+
+        tool.execute("Missing")
+
+        assert tool.last_sources == []
+        assert tool.last_source_links == []
