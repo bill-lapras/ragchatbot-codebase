@@ -141,10 +141,11 @@ function addMessage(content, type, sources = null, sourceLinks = null, isWelcome
         // Create sources with clickable links when available
         const sourcesHtml = sources.map((source, index) => {
             const link = sourceLinks && sourceLinks[index];
+            const label = escapeHtml(source);
             if (link) {
-                return `<a href="${link}" target="_blank" class="source-link">${source}</a>`;
+                return `<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" class="source-link">${label}</a>`;
             } else {
-                return source;
+                return label;
             }
         }).join(', ');
         

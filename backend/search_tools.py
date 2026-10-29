@@ -110,19 +110,26 @@ class CourseSearchTool(Tool):
                 header += f" - Lesson {lesson_num}"
             header += "]"
 
+            formatted.append(f"{header}\n{doc}")
+
             # Track source for the UI
             source = course_title
             if lesson_num is not None:
                 source += f" - Lesson {lesson_num}"
-            sources.append(source)
 
-            # Get lesson link if available
-            lesson_link = None
+            # Several chunks often come from the same lesson; list it once
+            if source in sources:
+                continue
+
+            # Prefer the lesson link, fall back to the course link
+            link = None
             if lesson_num is not None:
-                lesson_link = self.store.get_lesson_link(course_title, lesson_num)
-            source_links.append(lesson_link)
+                link = self.store.get_lesson_link(course_title, lesson_num)
+            if not link:
+                link = self.store.get_course_link(course_title)
 
-            formatted.append(f"{header}\n{doc}")
+            sources.append(source)
+            source_links.append(link)
 
         # Store sources and links for retrieval
         self.last_sources = sources

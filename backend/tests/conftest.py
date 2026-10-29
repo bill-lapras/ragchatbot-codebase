@@ -115,6 +115,7 @@ def mock_vector_store():
     )
     mock._resolve_course_name.return_value = "Test Course"
     mock.get_lesson_link.return_value = "https://example.com/lesson1"
+    mock.get_course_link.return_value = None
     return mock
 
 
