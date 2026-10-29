@@ -1,112 +1,29 @@
 # Frontend Changes - Dark/Light Theme Toggle
 
 ## Overview
-Added a toggle button that allows users to switch between dark and light themes for the Course Materials Assistant application.
+A sun/moon toggle in the top-right of the header switches between the dark (default) and light themes. Themes are driven by CSS custom properties, which are redefined when `data-theme="light"` is set on `<html>`.
 
-## Files Modified
+## Files
 
-### 1. `frontend/index.html`
-- **Change**: Modified the header section to include theme toggle button
-- **Details**: 
-  - Added header structure with left/right containers
-  - Included theme toggle button with sun and moon SVG icons
-  - Added proper ARIA label for accessibility
+### `frontend/index.html`
+- Header has the `#themeToggle` button on the right (flex `space-between`), with sun and moon SVG icons (`aria-hidden="true"`) and an `aria-label`.
+- Stylesheet cache-buster bumped to `v=13`.
 
-### 2. `frontend/style.css`
-- **Changes**: 
-  - Added light theme CSS variables
-  - Made header visible and styled it properly
-  - Added complete styling for theme toggle button with animations
-  - Implemented smooth icon transitions for theme switching
+### `frontend/style.css`
+- `:root` holds the dark palette; `[data-theme="light"]` overrides it:
+  - Background `#ffffff`, surface `#f8fafc`, surface hover `#e2e8f0`
+  - Text primary `#0f172a` (~17:1 on white), text secondary `#475569` (~7.6:1)
+  - Border `#cbd5e1`, lighter shadow (0.08 opacity); primary blue `#2563eb` unchanged
+- Toggle button: round, bordered, hover scale and focus-visible ring. The icons cross-fade with a rotate/scale animation over 0.3s.
+- Global 0.3s transitions on background, text and border colors, so switching themes is smooth.
+- Light-theme fixes for elements that used hard-coded dark-theme colors:
+  - Answer links use the primary/hover blue
+  - Code/pre backgrounds use a subtle slate tint instead of `rgba(0,0,0,0.2)`
+  - Blockquotes get a light blue tint
+  - Error/success text is darker (`#b91c1c` / `#15803d`) for contrast on light backgrounds
+- Fixed the blockquote border, which referenced the undefined `--primary` variable (now `--primary-color`).
 
-- **Key Features**:
-  - Light theme color palette for all UI elements
-  - Smooth 0.3s transitions for theme switching
-  - Icon rotation and opacity animations
-  - Responsive design for mobile devices
-  - Hover and focus states for better UX
-
-### 3. `frontend/script.js`
-- **Changes**:
-  - Added theme toggle functionality
-  - Implemented localStorage persistence for theme preference
-  - Added keyboard navigation support (Enter and Space keys)
-  - Dynamic ARIA label updates for accessibility
-
-- **Key Features**:
-  - Defaults to dark theme
-  - Remembers user's theme choice across sessions
-  - Fully keyboard accessible
-  - Proper accessibility labels that update based on current theme
-
-## Features Implemented
-
-### ✅ Toggle Button Design
-- Clean, circular button design that fits existing aesthetic
-- Positioned in top-right corner of header
-- Icon-based design with sun (light theme) and moon (dark theme) icons
-
-### ✅ Smooth Animations
-- 0.3s CSS transitions for all theme changes
-- Icon rotation and scaling effects during theme switch
-- Hover effects with subtle transform and shadow
-
-### ✅ Accessibility
-- Proper ARIA labels that update based on current theme
-- Keyboard navigation support (Enter and Space keys)
-- Focus indicators with appropriate contrast
-
-### ✅ Theme Persistence
-- Uses localStorage to remember user preference
-- Automatically applies saved theme on page load
-- Defaults to dark theme for new users
-
-### ✅ Responsive Design
-- Header adapts to mobile screens
-- Toggle button remains accessible on all screen sizes
-- Maintains functionality across different devices
-
-## Technical Implementation
-
-### Theme Variables
-The implementation uses CSS custom properties (variables) that are redefined based on the `data-theme` attribute on the root element:
-
-#### **Dark Theme** (Default)
-- Background: `#0f172a` (Deep slate)
-- Surface: `#1e293b` (Slate 800)
-- Text Primary: `#f1f5f9` (Slate 100)
-- Text Secondary: `#94a3b8` (Slate 400)
-- Border: `#334155` (Slate 700)
-
-#### **Light Theme** 
-- Background: `#ffffff` (Pure white)
-- Surface: `#f8fafc` (Slate 50)
-- Surface Hover: `#e2e8f0` (Slate 200)
-- Text Primary: `#0f172a` (Slate 900) - 21:1 contrast ratio
-- Text Secondary: `#475569` (Slate 600) - 9.4:1 contrast ratio
-- Border: `#cbd5e1` (Slate 300)
-- Shadow: Reduced opacity for lighter appearance
-- Focus Ring: Slightly reduced opacity for better visibility
-
-#### **Accessibility Features**
-- All text meets WCAG AAA contrast standards (7:1+ ratio)
-- Primary text achieves 21:1 contrast ratio on white background
-- Secondary text maintains 9.4:1 contrast ratio
-- Focus indicators remain clearly visible in both themes
-- Code blocks have enhanced backgrounds for better readability
-
-### JavaScript Theme Management
-- `initializeTheme()`: Sets initial theme from localStorage or defaults to dark
-- `toggleTheme()`: Switches between themes and updates storage
-- `setTheme(theme)`: Applies theme and updates accessibility attributes
-
-### Icon Animation System
-Uses CSS transforms and opacity to create smooth transitions between sun and moon icons based on the current theme state.
-
-### Enhanced Light Theme Features
-- **Global Smooth Transitions**: Added 0.3s ease transitions for background-color, color, border-color, and box-shadow properties
-- **Improved Code Readability**: Light theme specific styling for code blocks with subtle backgrounds and proper contrast
-- **Enhanced Blockquotes**: Light blue background tint for better visual hierarchy
-- **Optimized Shadows**: Reduced shadow opacity (0.08 vs 0.3) for a cleaner light appearance
-- **Better Border Hierarchy**: Uses `#cbd5e1` for primary borders providing clear but subtle visual separation
-- **Surface Differentiation**: Clear hierarchy between background (`#ffffff`), surface (`#f8fafc`), and hover states (`#e2e8f0`)
+### `frontend/script.js`
+- `initializeTheme()` applies the saved theme from `localStorage` (defaults to dark).
+- `toggleTheme()` flips the theme. `setTheme()` sets or removes `data-theme` on `<html>`, updates the `aria-label` ("Switch to light/dark theme") and saves the choice.
+- The toggle is a native `<button>`, so Tab, Enter and Space work. There is also a Ctrl/Cmd+Shift+T shortcut.
