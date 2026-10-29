@@ -3,6 +3,7 @@ const API_URL = '/api';
 
 // Global state
 let currentSessionId = null;
+let chatGeneration = 0; // Incremented on new chat so in-flight replies are discarded
 
 // DOM elements
 let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton, themeToggle;
@@ -66,6 +67,7 @@ async function sendMessage() {
     chatInput.value = '';
     chatInput.disabled = true;
     sendButton.disabled = true;
+    const generation = chatGeneration;
 
     // Add user message
     addMessage(query, 'user');
@@ -90,6 +92,9 @@ async function sendMessage() {
         if (!response.ok) throw new Error('Query failed');
 
         const data = await response.json();
+
+        // Ignore replies for a chat that was replaced while waiting
+        if (generation !== chatGeneration) return;
         
         // Update session ID if new
         if (!currentSessionId) {
@@ -101,6 +106,7 @@ async function sendMessage() {
         addMessage(data.answer, 'assistant', data.sources, data.source_links);
 
     } catch (error) {
+        if (generation !== chatGeneration) return;
         // Replace loading message with error
         loadingMessage.remove();
         addMessage(`Error: ${error.message}`, 'assistant');
@@ -197,6 +203,7 @@ async function startNewChat() {
 }
 
 async function createNewSession() {
+    chatGeneration++;
     currentSessionId = null;
     chatMessages.innerHTML = '';
     chatInput.value = '';
@@ -213,6 +220,9 @@ async function loadCourseStats() {
         if (!response.ok) throw new Error('Failed to load course stats');
         
         const data = await response.json();
+
+        // Ignore replies for a chat that was replaced while waiting
+        if (generation !== chatGeneration) return;
         console.log('Course data received:', data);
         
         // Update stats in UI
