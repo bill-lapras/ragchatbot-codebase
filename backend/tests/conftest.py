@@ -1,6 +1,5 @@
 import tempfile
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from config import Config
