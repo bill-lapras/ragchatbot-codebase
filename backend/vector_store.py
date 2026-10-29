@@ -161,6 +161,7 @@ class VectorStore:
                     "lesson_number": lesson.lesson_number,
                     "lesson_title": lesson.title,
                     "lesson_link": lesson.lesson_link,
+                    "summary": lesson.summary,
                 }
             )
 

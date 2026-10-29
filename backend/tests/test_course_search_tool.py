@@ -377,3 +377,21 @@ class TestCourseOutlineTool:
 
         assert tool.last_sources == []
         assert tool.last_source_links == []
+
+    def test_outline_includes_lesson_summaries(self, mock_vector_store):
+        """Stored key points appear under their lesson"""
+        lessons = [
+            {
+                "lesson_number": 1,
+                "lesson_title": "Basics",
+                "lesson_link": None,
+                "summary": "- Point one\n- Point two",
+            }
+        ]
+        mock_vector_store.course_catalog.get.return_value = {
+            "metadatas": [{"title": "Test Course", "lessons_json": json.dumps(lessons)}]
+        }
+
+        result = CourseOutlineTool(mock_vector_store).execute("Test")
+
+        assert "Lesson 1: Basics\n- Point one\n- Point two" in result

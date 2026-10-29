@@ -213,6 +213,8 @@ class CourseOutlineTool(Tool):
                 lesson_num = lesson.get("lesson_number", "N/A")
                 lesson_title = lesson.get("lesson_title", "N/A")
                 outline.append(f"Lesson {lesson_num}: {lesson_title}")
+                if lesson.get("summary"):
+                    outline.append(lesson["summary"])
                 sources.append(f"Lesson {lesson_num}: {lesson_title}")
                 source_links.append(lesson.get("lesson_link"))
 
