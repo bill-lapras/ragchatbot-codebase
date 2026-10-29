@@ -1,14 +1,7 @@
-import os
-import sys
+import json
 from unittest.mock import Mock, patch
 
 import pytest
-
-# Add parent directory to path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import json
-
 from search_tools import CourseOutlineTool, CourseSearchTool
 from vector_store import SearchResults
 

@@ -1,15 +1,10 @@
-import os
-import sys
 import tempfile
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from fastapi.testclient import TestClient
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from config import Config
+from fastapi.testclient import TestClient
 from models import Course, CourseChunk, Lesson
 from vector_store import SearchResults
 
@@ -274,12 +269,13 @@ def mock_rag_system():
 @pytest.fixture
 def test_app():
     """Create a test FastAPI app with mocked dependencies"""
+    from typing import List, Optional
+
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.middleware.trustedhost import TrustedHostMiddleware
     from pydantic import BaseModel
-    from typing import List, Optional
-    
+
     # Create test app without static file mounting
     app = FastAPI(title="Course Materials RAG System Test", root_path="")
     
