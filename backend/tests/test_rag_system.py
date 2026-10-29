@@ -1,13 +1,8 @@
 import os
-import sys
 import tempfile
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-
-# Add parent directory to path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from models import Course, CourseChunk, Lesson
 from rag_system import RAGSystem
 
