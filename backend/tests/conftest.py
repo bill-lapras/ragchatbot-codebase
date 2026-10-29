@@ -1,5 +1,6 @@
 import tempfile
-from unittest.mock import Mock
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from config import Config
@@ -247,9 +248,37 @@ SAMPLE_QUERY_RESPONSES = {
 }
 
 
+@pytest.fixture(scope="session")
+def app_module(tmp_path_factory):
+    """Import the real app.py without building a RAGSystem or needing ../frontend.
+
+    app.py constructs RAGSystem and mounts ../frontend (relative to the cwd) at
+    import time, so import it with RAGSystem patched from a temp backend/ dir
+    whose sibling frontend/ holds a stub index.html. Returns (module, backend_dir).
+    """
+    import importlib
+    import os
+    import sys
+
+    root = tmp_path_factory.mktemp("app_root")
+    (root / "backend").mkdir()
+    (root / "frontend").mkdir()
+    (root / "frontend" / "index.html").write_text("<html>Course Materials</html>")
+
+    sys.modules.pop("app", None)
+    cwd = os.getcwd()
+    os.chdir(root / "backend")
+    try:
+        with patch("rag_system.RAGSystem"):
+            module = importlib.import_module("app")
+    finally:
+        os.chdir(cwd)
+    return module, root / "backend"
+
+
 @pytest.fixture
-def mock_rag_system():
-    """Create a mock RAG system for API testing"""
+def mock_rag_system(app_module, monkeypatch):
+    """Fresh mock RAG system swapped into app.py for each test"""
     mock = Mock()
     mock.query.return_value = (
         "This is a test response about course content.",
@@ -263,106 +292,19 @@ def mock_rag_system():
             "Advanced AI Techniques",
         ],
     }
-    mock.session_manager.create_session.return_value = "test-session-123"
+    mock.session_manager.create_session.return_value = "new-session-456"
     mock.session_manager.clear_session.return_value = None
+    monkeypatch.setattr(app_module[0], "rag_system", mock)
     return mock
 
 
 @pytest.fixture
-def test_app():
-    """Create a test FastAPI app with mocked dependencies"""
-    from typing import List, Optional
-
-    from fastapi import FastAPI
-    from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.middleware.trustedhost import TrustedHostMiddleware
-    from pydantic import BaseModel
-
-    # Create test app without static file mounting
-    app = FastAPI(title="Course Materials RAG System Test", root_path="")
-
-    # Add middleware
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
-
-    # Pydantic models
-    class QueryRequest(BaseModel):
-        query: str
-        session_id: Optional[str] = None
-
-    class QueryResponse(BaseModel):
-        answer: str
-        sources: List[str]
-        source_links: List[Optional[str]]
-        session_id: str
-
-    class CourseStats(BaseModel):
-        total_courses: int
-        course_titles: List[str]
-
-    class ClearSessionRequest(BaseModel):
-        session_id: str
-
-    # Mock RAG system
-    mock_rag = Mock()
-    mock_rag.query.return_value = (
-        "This is a test response about course content.",
-        ["Building Towards Computer Use with Anthropic - Lesson 1"],
-        ["https://example.com/lesson1"],
-    )
-    mock_rag.get_course_analytics.return_value = {
-        "total_courses": 2,
-        "course_titles": [
-            "Building Towards Computer Use with Anthropic",
-            "Advanced AI Techniques",
-        ],
-    }
-    mock_rag.session_manager.create_session.return_value = "test-session-123"
-    mock_rag.session_manager.clear_session.return_value = None
-
-    # API endpoints
-    @app.post("/api/query", response_model=QueryResponse)
-    async def query_documents(request: QueryRequest):
-        session_id = request.session_id or mock_rag.session_manager.create_session()
-        answer, sources, source_links = mock_rag.query(request.query, session_id)
-        return QueryResponse(
-            answer=answer,
-            sources=sources,
-            source_links=source_links,
-            session_id=session_id,
-        )
-
-    @app.get("/api/courses", response_model=CourseStats)
-    async def get_course_stats():
-        analytics = mock_rag.get_course_analytics()
-        return CourseStats(
-            total_courses=analytics["total_courses"],
-            course_titles=analytics["course_titles"],
-        )
-
-    @app.post("/api/clear-session")
-    async def clear_session(request: ClearSessionRequest):
-        mock_rag.session_manager.clear_session(request.session_id)
-        return {"status": "success", "message": "Session cleared successfully"}
-
-    @app.get("/")
-    async def root():
-        return {"message": "Course Materials RAG System API"}
-
-    return app
-
-
-@pytest.fixture
-def client(test_app):
-    """Create a test client for the FastAPI app"""
-    return TestClient(test_app)
+def client(app_module, mock_rag_system, monkeypatch):
+    """Test client for the real app; not a context manager, so startup (document loading) doesn't run"""
+    module, backend_dir = app_module
+    # StaticFiles resolves ../frontend against the cwd on each request
+    monkeypatch.chdir(backend_dir)
+    return TestClient(module.app)
 
 
 @pytest.fixture
