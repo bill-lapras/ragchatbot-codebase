@@ -143,6 +143,8 @@ class CourseOutlineTool(Tool):
 
     def __init__(self, vector_store: VectorStore):
         self.store = vector_store
+        self.last_sources = []  # Course and lessons from last outline
+        self.last_source_links = []  # Their links
 
     def get_tool_definition(self) -> Dict[str, Any]:
         """Return Anthropic tool definition for this tool"""
@@ -171,6 +173,9 @@ class CourseOutlineTool(Tool):
         Returns:
             Formatted course outline or error message
         """
+        self.last_sources = []
+        self.last_source_links = []
+
         # Resolve course name using vector store's existing method
         course_title = self.store._resolve_course_name(course_name)
         if not course_title:
@@ -200,10 +205,20 @@ class CourseOutlineTool(Tool):
             outline.append(f"**Total Lessons:** {len(lessons)}")
             outline.append("\n**Lesson Outline:**")
 
+            title = metadata.get("title", course_title)
+            sources = [title]
+            source_links = [metadata.get("course_link")]
+
             for lesson in lessons:
                 lesson_num = lesson.get("lesson_number", "N/A")
                 lesson_title = lesson.get("lesson_title", "N/A")
                 outline.append(f"Lesson {lesson_num}: {lesson_title}")
+                sources.append(f"Lesson {lesson_num}: {lesson_title}")
+                source_links.append(lesson.get("lesson_link"))
+
+            # Store sources and links for the UI
+            self.last_sources = sources
+            self.last_source_links = source_links
 
             return "\n".join(outline)
 
