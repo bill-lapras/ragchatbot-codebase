@@ -766,32 +766,25 @@ details[open] .suggested-header::before {
 .new-chat-button {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 0.5rem;
     width: 100%;
-    padding: 0.625rem 1rem;
+    padding: 0.5rem 0;
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    background: var(--background);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    background: none;
+    border: none;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease;
 }
 
-.new-chat-button:hover {
-    color: var(--primary-color);
-    border-color: var(--primary-color);
-    background: var(--surface-hover);
-}
-
+.new-chat-button:hover,
 .new-chat-button:focus {
     outline: none;
     color: var(--primary-color);
-    border-color: var(--primary-color);
 }
 
 .new-chat-button:focus-visible {
