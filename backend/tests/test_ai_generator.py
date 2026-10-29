@@ -1,6 +1,5 @@
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import pytest
 from ai_generator import AIGenerator
 
 
@@ -202,7 +201,7 @@ class TestAIGenerator:
             generator = AIGenerator("test-api-key", "claude-sonnet-4-20250514")
 
             # Execute
-            response = generator.generate_response(
+            generator.generate_response(
                 "What's in lesson 1?",
                 tools=mock_tool_manager.get_tool_definitions(),
                 tool_manager=mock_tool_manager,

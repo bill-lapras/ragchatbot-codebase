@@ -87,6 +87,8 @@ Use this script to verify code quality without modifying files. Perfect for:
 
 Exit code 0 = all checks pass, non-zero = issues found.
 
+Config: Black, isort and mypy read `pyproject.toml`; flake8 reads `.flake8` (it ignores `pyproject.toml`). flake8 leaves line length to Black (E501 ignored). Both scripts run from any directory and exit non-zero if any step fails.
+
 #### Troubleshooting
 If scripts aren't executable: `chmod +x scripts/*.sh`
 

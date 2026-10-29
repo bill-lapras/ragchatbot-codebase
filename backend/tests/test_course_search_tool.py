@@ -1,7 +1,5 @@
 import json
-from unittest.mock import Mock, patch
 
-import pytest
 from search_tools import CourseOutlineTool, CourseSearchTool
 from vector_store import SearchResults
 

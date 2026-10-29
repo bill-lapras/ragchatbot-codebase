@@ -1,9 +1,6 @@
-import os
-import tempfile
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import pytest
-from models import Course, CourseChunk, Lesson
+from models import Course, CourseChunk
 from rag_system import RAGSystem
 
 
@@ -40,7 +37,7 @@ class TestRAGSystem:
             patch("rag_system.SessionManager"),
         ):
 
-            rag_system = RAGSystem(broken_config)
+            RAGSystem(broken_config)
 
             # Verify VectorStore was initialized with broken config
             mock_vector_store.assert_called_once_with(

@@ -9,6 +9,7 @@ from config import config
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from rag_system import RAGSystem
@@ -126,13 +127,7 @@ async def startup_event():
             print(f"Error loading documents: {e}")
 
 
-import os
-from pathlib import Path
-
-from fastapi.responses import FileResponse
-
 # Custom static file handler with no-cache headers for development
-from fastapi.staticfiles import StaticFiles
 
 
 class DevStaticFiles(StaticFiles):
