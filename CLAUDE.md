@@ -24,10 +24,27 @@ uv sync
 # Add new dependencies (use uv instead of pip)
 uv add package_name
 
-# Environment variables required
-# Create .env file with:
+# Environment variables (.env file, loaded by python-dotenv in backend/config.py)
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# Optional:
+ANTHROPIC_MODEL=claude-sonnet-4-20250514   # default if unset
+ANTHROPIC_BASE_URL=                        # empty = api.anthropic.com
 ```
+
+#### Using the Spotify Taskforce gateway
+Keys from taskforce.spotify.net/api-keys only work against the gateway, not api.anthropic.com. `TASKFORCE_API_KEY` is exported in `~/.zshrc`, and `.env` references it:
+```bash
+ANTHROPIC_API_KEY=${TASKFORCE_API_KEY}   # braces required; dotenv won't expand $VAR
+ANTHROPIC_BASE_URL=https://hendrix-genai.spotify.net/taskforce/anthropic
+ANTHROPIC_MODEL=claude-sonnet-4-5
+```
+When `ANTHROPIC_BASE_URL` is set, `AIGenerator` also sends the gateway's `apikey` header. Start the server from a shell that has loaded `~/.zshrc` (e.g. `zsh -ic './run.sh'` from a non-interactive shell), or the key resolves to empty.
+
+### Testing
+```bash
+cd backend && uv run pytest -q
+```
+Tests live in `backend/tests/` (fixtures in `conftest.py`). `Config` reads env vars per instance, so tests that check defaults must clear the environment (`patch.dict(os.environ, {}, clear=True)`) to avoid picking up `.env`.
 
 ### Python Execution
 Always use `uv` for running Python files and commands:
@@ -96,16 +113,19 @@ This is a Retrieval-Augmented Generation (RAG) system for course materials with 
 - Supports filtered search by course name and lesson number
 
 **AIGenerator (backend/ai_generator.py)**: Anthropic Claude API integration
-- Uses claude-sonnet-4-20250514 model
-- Implements tool calling for search functionality
-- Maintains conversation history via SessionManager
+- Model from `ANTHROPIC_MODEL` (default claude-sonnet-4-20250514); optional `ANTHROPIC_BASE_URL` gateway
+- Up to 2 rounds of tool calls, then a final call without tools (max 3 API calls per query)
+- Receives conversation history (from SessionManager, via RAGSystem) in the system prompt
 
 **Search Tools (backend/search_tools.py)**: Tool-based search system
-- CourseSearchTool: Semantic search across course content with intelligent course name resolution
-- ToolManager: Manages tool registration and execution for AI model
+- CourseSearchTool (`search_course_content`): Semantic search across course content with course name resolution; records sources/links for the UI and clears them at the start of each search
+- CourseOutlineTool (`get_course_outline`): Returns a course's title, link, and lesson list from the catalog
+- ToolManager: Registers tools, routes Claude's tool calls, and collects/resets sources. It holds no data; only VectorStore talks to ChromaDB
+
+**SessionManager (backend/session_manager.py)**: In-memory chat history per session (lost on restart)
 
 ### Data Flow
-1. Course documents (PDF, DOCX, TXT) are loaded from docs/ directory on startup
+1. Course documents are loaded from docs/ directory on startup (PDF/DOCX pass the extension filter but are read as UTF-8 text, so only .txt parses correctly)
 2. DocumentProcessor chunks content and extracts course metadata
 3. VectorStore stores both metadata and content in separate ChromaDB collections
 4. User queries trigger AI generation with access to search tools
@@ -128,6 +148,9 @@ This is a Retrieval-Augmented Generation (RAG) system for course materials with 
 
 - The system automatically loads documents from docs/ on startup
 - ChromaDB data persists in backend/chroma_db/
+- Ingestion skips courses whose title is already stored, so edited course files are not re-indexed; delete backend/chroma_db/ to rebuild
+- Course files must start with `Course Title:` / `Course Link:` / `Course Instructor:` lines, followed by `Lesson N: <title>` markers (optional `Lesson Link:` on the next line)
+- The `/api/query` endpoint is async but makes synchronous Anthropic and ChromaDB calls, which block the event loop
 - FastAPI serves both API endpoints (/api/*) and static frontend files
 - CORS is configured for development with broad permissions
 - No-cache headers are set for static files during development
